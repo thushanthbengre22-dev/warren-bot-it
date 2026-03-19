@@ -488,8 +488,11 @@
     return `in ${Math.floor(s/60)}m`;
   }
 
+  // ── API base (absolute when proxied via bengredev.com) ───────────────────
+  const API = 'https://warren-bot-it-production.up.railway.app';
+
   // ── SSE for live wallet + status ─────────────────────────────────────────
-  const evtSource = new EventSource('/api/stream');
+  const evtSource = new EventSource(`${API}/api/stream`);
   evtSource.onmessage = e => {
     const { wallet, status } = JSON.parse(e.data);
     updateWallet(wallet);
@@ -563,7 +566,7 @@
 
   // ── Trades (polled every 10s) ─────────────────────────────────────────────
   async function loadTrades() {
-    const res = await fetch('/api/trades');
+    const res = await fetch(`${API}/api/trades`);
     const trades = await res.json();
 
     // Open positions
@@ -601,7 +604,7 @@
 
   // ── Trends (polled every 30s) ─────────────────────────────────────────────
   async function loadTrends() {
-    const res = await fetch('/api/trends');
+    const res = await fetch(`${API}/api/trends`);
     const trends = await res.json();
     const chart = $('trendsChart');
 

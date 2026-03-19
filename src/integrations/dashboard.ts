@@ -6,6 +6,15 @@ import { getState } from '../store/state';
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (!origin || origin === 'https://www.bengredev.com' || origin === 'https://bengredev.com') {
+    res.setHeader('Access-Control-Allow-Origin', origin ?? '*');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET');
+  next();
+});
+
 app.use(express.static(path.resolve(__dirname, '../../public')));
 
 app.get('/api/wallet', async (_req, res) => {
