@@ -148,7 +148,7 @@ The Express server exposes these endpoints (consumed by the dashboard and SSE st
 | `GET /api/trades` | Full trade history array |
 | `GET /api/status` | Runtime cron state, current market being analyzed |
 | `GET /api/trends` | Daily aggregated spend / return / net P&L |
-| `GET /api/stream` | SSE stream — pushes wallet + status updates every 3 seconds |
+| `GET /api/stream` | SSE stream — pushes wallet + status updates only when the bot mutates state or wallet |
 
 ---
 
