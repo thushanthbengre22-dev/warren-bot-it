@@ -5,6 +5,9 @@ node_modules/
 dist/
 build/
 
+# Runtime data (persisted in Redis, not files)
+data/
+
 # Environment variables
 .env
 .env.local
