@@ -25,7 +25,12 @@ export async function monitorPositions(): Promise<void> {
 
       if (prices.closed) {
         const finalPrice = trade.side === 'YES' ? prices.yesPrice : prices.noPrice;
-        const won = finalPrice >= 0.5;
+        const won = finalPrice >= 0.95;
+        const isDefinitivelyResolved = finalPrice >= 0.95 || finalPrice <= 0.05;
+        if (!isDefinitivelyResolved) {
+          console.warn(`[Monitor] Market closed but price ambiguous (${finalPrice.toFixed(2)}) — skipping: ${trade.marketQuestion.slice(0, 50)}`);
+          continue;
+        }
         const payout = won ? trade.shares * 1 : 0;
         await resolveTrade(trade.id, payout, won ? 'won' : 'lost');
         if (won) {
