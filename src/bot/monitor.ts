@@ -24,7 +24,18 @@ export async function monitorPositions(): Promise<void> {
       }
 
       if (prices.closed) {
-        console.log(`[Monitor] Market closed/resolved — skipping: ${trade.marketQuestion.slice(0, 50)}`);
+        const finalPrice = trade.side === 'YES' ? prices.yesPrice : prices.noPrice;
+        const won = finalPrice >= 0.5;
+        const payout = won ? trade.shares * 1 : 0;
+        await resolveTrade(trade.id, payout, won ? 'won' : 'lost');
+        if (won) {
+          const profit = payout - trade.amount;
+          console.log(`[Monitor] RESOLVED WON — +$${profit.toFixed(2)} on ${trade.marketQuestion.slice(0, 40)}`);
+          notify(`✅ *Market Resolved — Won*\n${trade.marketQuestion}\nSide: ${trade.side}\nBought: $${trade.amount} → Payout: $${payout.toFixed(2)} (+$${profit.toFixed(2)})`);
+        } else {
+          console.log(`[Monitor] RESOLVED LOST — -$${trade.amount.toFixed(2)} on ${trade.marketQuestion.slice(0, 40)}`);
+          notify(`❌ *Market Resolved — Lost*\n${trade.marketQuestion}\nSide: ${trade.side}\nBought: $${trade.amount} → Payout: $0.00 (-$${trade.amount.toFixed(2)})`);
+        }
         continue;
       }
 
