@@ -1,4 +1,5 @@
 import { getRedis } from './redis';
+import { emitUpdate } from './events';
 
 const WALLET_KEY = 'warren:wallet';
 
@@ -60,6 +61,7 @@ export async function recordTrade(trade: Omit<Trade, 'id' | 'timestamp'>): Promi
   state.balance -= newTrade.amount;
   state.trades.push(newTrade);
   await saveState(state);
+  emitUpdate();
   return newTrade;
 }
 
@@ -73,6 +75,7 @@ export async function resolveTrade(id: string, payout: number, status: 'won' | '
   state.balance += payout;
   state.totalPnl += payout - trade.amount;
   await saveState(state);
+  emitUpdate();
   return trade;
 }
 

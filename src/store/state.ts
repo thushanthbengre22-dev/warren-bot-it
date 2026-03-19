@@ -1,5 +1,6 @@
 // Shared runtime state — updated by the bot, read by the dashboard
 import { TradeSignal } from '../bot/executor';
+import { emitUpdate } from './events';
 
 export interface PendingApproval {
   id: string;
@@ -47,22 +48,27 @@ export function getState(): Readonly<BotState> {
 
 export function setCronRunning(running: boolean): void {
   state.cronRunning = running;
+  emitUpdate();
 }
 
 export function setLastScan(last: string, next: string): void {
   state.lastScanAt = last;
   state.nextScanAt = next;
+  emitUpdate();
 }
 
 export function setCurrentMarket(question: string | null): void {
   state.currentlyScanningMarket = question;
+  emitUpdate();
 }
 
 export function addPendingApproval(approval: PendingApproval): void {
   state.pendingApprovals.push(approval);
+  emitUpdate();
 }
 
 export function removePendingApproval(id: string): void {
   const idx = state.pendingApprovals.findIndex(a => a.id === id);
   if (idx !== -1) state.pendingApprovals.splice(idx, 1);
+  emitUpdate();
 }

@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'path';
 import { getWalletState, getPnlSummary } from '../store/memory';
 import { getState } from '../store/state';
+import { onUpdate } from '../store/events';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -62,7 +63,7 @@ app.get('/api/trends', async (_req, res) => {
   res.json(trends);
 });
 
-// SSE — push live updates every 3 seconds
+// SSE — push updates only when the bot mutates state or wallet
 app.get('/api/stream', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -74,8 +75,8 @@ app.get('/api/stream', (req, res) => {
   };
 
   send();
-  const interval = setInterval(send, 3000);
-  req.on('close', () => clearInterval(interval));
+  const unsubscribe = onUpdate(send);
+  req.on('close', unsubscribe);
 });
 
 export function startDashboard(): void {
