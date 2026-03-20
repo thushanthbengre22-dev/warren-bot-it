@@ -45,7 +45,8 @@ export interface MarketPrice {
   noPrice: number;
   yesLabel: string;
   noLabel: string;
-  closed: boolean;
+  closed: boolean;    // truly resolved by Polymarket (m.closed)
+  inactive: boolean;  // trading paused/halted but not yet resolved
 }
 
 export async function fetchMarketPrice(marketId: string): Promise<MarketPrice | null> {
@@ -59,7 +60,7 @@ export async function fetchMarketPrice(marketId: string): Promise<MarketPrice | 
     const m = markets[0];
     const prices = parsePrices(m);
     if (!prices) return null;
-    return { ...prices, closed: !!m.closed || !m.active };
+    return { ...prices, closed: !!m.closed, inactive: !m.active };
   } catch {
     return null;
   }

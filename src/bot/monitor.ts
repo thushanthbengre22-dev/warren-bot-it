@@ -23,6 +23,11 @@ export async function monitorPositions(): Promise<void> {
         continue;
       }
 
+      if (prices.inactive && !prices.closed) {
+        console.log(`[Monitor] Market inactive (trading paused) — skipping: ${trade.marketQuestion.slice(0, 50)}`);
+        continue;
+      }
+
       if (prices.closed) {
         const finalPrice = trade.side === 'YES' ? prices.yesPrice : prices.noPrice;
         const won = finalPrice >= 0.95;
