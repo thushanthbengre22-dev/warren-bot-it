@@ -89,7 +89,7 @@ async function main(): Promise<void> {
 
   await scanCycle();
 
-  cron.schedule(CONFIG.CRON_SCHEDULE, scanCycle);
+  cron.schedule(CONFIG.CRON_SCHEDULE, scanCycle, { timezone: 'America/New_York' });
   console.log('[Cron] Scheduled. Bot is live.');
 }
 
