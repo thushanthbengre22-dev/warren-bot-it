@@ -60,7 +60,7 @@ async function scanCycle(): Promise<void> {
           sendSignal(signal);
         }
 
-        await new Promise(r => setTimeout(r, 1500));
+        await new Promise(r => setTimeout(r, 3000));
       } catch (err) {
         console.error(`[Analyze] Error on market ${market.id}:`, err);
       }
