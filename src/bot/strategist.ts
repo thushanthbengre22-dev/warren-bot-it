@@ -65,19 +65,30 @@ Return JSON only — no markdown, no explanation outside the JSON:
 }
 `;
 
-  const message = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 256,
-    system: `You are a prediction market analyst. You MUST respond with valid JSON only — no prose, no explanation, no markdown, no preamble. Your entire response must be a single JSON object.
+  let message;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      message = await client.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 256,
+        system: `You are a prediction market analyst. You MUST respond with valid JSON only — no prose, no explanation, no markdown, no preamble. Your entire response must be a single JSON object.
 Only recommend a trade if:
 - Your probability differs from market price by > ${CONFIG.MIN_EDGE * 100}%
 - Your confidence is > ${CONFIG.MIN_CONFIDENCE}
 - The news is recent and relevant
 When uncertain, set recommendation to SKIP. Capital preservation > chasing signals.`,
-    messages: [{ role: 'user', content: prompt }],
-  });
+        messages: [{ role: 'user', content: prompt }],
+      });
+      break;
+    } catch (err: any) {
+      if (attempt === 3 || err?.status !== 529) throw err;
+      const delay = attempt * 15_000;
+      console.warn(`[Strategist] Overloaded (529), retrying in ${delay / 1000}s... (attempt ${attempt}/3)`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
 
-  const text = message.content[0].type === 'text' ? message.content[0].text : '';
+  const text = message!.content[0].type === 'text' ? message!.content[0].text : '';
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) throw new Error(`No JSON found in Claude response: ${text.slice(0, 100)}`);
   const result: StrategyResult = JSON.parse(match[0]);
