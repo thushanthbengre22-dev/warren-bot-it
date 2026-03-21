@@ -29,6 +29,11 @@ export async function monitorPositions(): Promise<void> {
       }
 
       if (prices.closed) {
+        const endDate = prices.endDate ? new Date(prices.endDate) : null;
+        if (endDate && endDate > new Date()) {
+          console.warn(`[Monitor] Market closed but endDate is in the future (${prices.endDate}) — skipping: ${trade.marketQuestion.slice(0, 50)}`);
+          continue;
+        }
         const finalPrice = trade.side === 'YES' ? prices.yesPrice : prices.noPrice;
         const won = finalPrice >= 0.99;
         const isDefinitivelyResolved = finalPrice >= 0.99 || finalPrice <= 0.01;
