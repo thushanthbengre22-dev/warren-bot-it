@@ -90,7 +90,7 @@ When uncertain, set recommendation to SKIP. Capital preservation > chasing signa
   }
 
   const text = message!.content[0].type === 'text' ? message!.content[0].text : '';
-  const match = text.match(/\{[\s\S]*/);
+  const match = text.match(/\{[\s\S]*\}/);
   if (!match) {
     console.warn(`[Strategist] Non-JSON response from Claude, skipping market. Response: ${text.slice(0, 100)}`);
     return { probability: 0, confidence: 0, reasoning: 'Claude returned non-JSON response', recommendation: 'SKIP' };
