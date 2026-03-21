@@ -41,20 +41,23 @@ export async function analyzeMarket(market: Market): Promise<StrategyResult> {
       ).join('\n')}`
     : 'No recent trades.';
 
+  const now = new Date().toISOString();
   const prompt = `
+Today's date/time (UTC): ${now}
 Market: ${market.question}
 Description: ${market.description}
 YES means: "${market.yesLabel}" | NO means: "${market.noLabel}"
 Current YES price: ${market.yesPrice} (implied ${(market.yesPrice * 100).toFixed(1)}% probability)
 Current NO price: ${market.noPrice} (implied ${(market.noPrice * 100).toFixed(1)}% probability)
 24h Volume: $${market.volume.toFixed(0)}
-Closes: ${market.endDate}
+Market resolution deadline: ${market.endDate} (note: for sports this may be 24-48h after the actual event)
 
 Recent news:
 ${news}
 
 ${tradeContext}
 
+IMPORTANT: If the news or the market question suggests the underlying event has already taken place, return SKIP immediately.
 Estimate the true probability that the YES outcome ("${market.yesLabel}") occurs.
 Return JSON only — no markdown, no explanation outside the JSON:
 {
