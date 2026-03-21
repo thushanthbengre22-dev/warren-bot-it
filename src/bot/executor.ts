@@ -20,6 +20,12 @@ export async function buildSignal(market: Market, strategy: StrategyResult): Pro
   if (strategy.confidence < CONFIG.MIN_CONFIDENCE)
     return skip(`confidence ${(strategy.confidence * 100).toFixed(0)}% < ${CONFIG.MIN_CONFIDENCE * 100}%`);
 
+  if (market.endDate) {
+    const hoursUntilEnd = (new Date(market.endDate).getTime() - Date.now()) / (1000 * 60 * 60);
+    if (hoursUntilEnd < 2)
+      return skip(`market ends in ${hoursUntilEnd.toFixed(1)}h — too close to completion`);
+  }
+
   const side = strategy.recommendation === 'BUY_YES' ? 'YES' : 'NO';
   const marketPrice = side === 'YES' ? market.yesPrice : market.noPrice;
   const edge = Math.abs(strategy.probability - marketPrice);
