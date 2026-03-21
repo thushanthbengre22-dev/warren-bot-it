@@ -72,6 +72,7 @@ Return JSON only — no markdown, no explanation outside the JSON:
         model: 'claude-sonnet-4-6',
         max_tokens: 256,
         system: `You are a prediction market analyst. You MUST respond with valid JSON only — no prose, no explanation, no markdown, no preamble. Your entire response must be a single JSON object.
+Even if the event has already occurred or the market has expired, still return valid JSON with recommendation: "SKIP".
 Only recommend a trade if:
 - Your probability differs from market price by > ${CONFIG.MIN_EDGE * 100}%
 - Your confidence is > ${CONFIG.MIN_CONFIDENCE}
@@ -89,8 +90,10 @@ When uncertain, set recommendation to SKIP. Capital preservation > chasing signa
   }
 
   const text = message!.content[0].type === 'text' ? message!.content[0].text : '';
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error(`No JSON found in Claude response: ${text.slice(0, 100)}`);
-  const result: StrategyResult = JSON.parse(match[0]);
-  return result;
+  const match = text.match(/\{[\s\S]*/);
+  if (!match) {
+    console.warn(`[Strategist] Non-JSON response from Claude, skipping market. Response: ${text.slice(0, 100)}`);
+    return { probability: 0, confidence: 0, reasoning: 'Claude returned non-JSON response', recommendation: 'SKIP' };
+  }
+  return JSON.parse(match[0]) as StrategyResult;
 }
