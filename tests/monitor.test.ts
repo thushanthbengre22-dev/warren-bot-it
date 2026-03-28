@@ -29,10 +29,11 @@ const mockResolveTrade     = resolveTrade     as jest.MockedFunction<typeof reso
 
 function makeTrade(overrides: Partial<Trade> = {}): Trade {
   return {
-    id:              'trade_001',
-    timestamp:       '2026-03-01T10:00:00.000Z',
-    marketId:        '0xabc123',
-    marketQuestion:  'Will candidate X win the election?',
+    id:                'trade_001',
+    timestamp:         '2026-03-01T10:00:00.000Z',
+    marketId:          '0xabc123',
+    marketInternalId:  '987654',
+    marketQuestion:    'Will candidate X win the election?',
     side:            'YES',
     marketPrice:     0.755,
     claudeEstimate:  0.85,
@@ -261,6 +262,27 @@ describe('stop-loss and take-profit logic', () => {
     mockFetchMarketPrice.mockResolvedValue(makePrice({
       yesPrice: 0.55,  // +10% return — within bounds
       closed:   false,
+    }));
+
+    await monitorPositions();
+
+    expect(mockResolveTrade).not.toHaveBeenCalled();
+  });
+
+});
+
+describe('zero price guard', () => {
+
+  it('should skip trade when both prices are 0 (stale/corrupt API data)', async () => {
+    // This is the exact scenario that caused the Iran market 100% loss:
+    // Polymarket returned yesPrice=0, noPrice=0, endDate=2020-11-04 (5 years ago)
+    // finalPrice=0 satisfied <=0.01 → isDefinitivelyResolved=true → payout=0
+    mockGetOpenTrades.mockResolvedValue([makeTrade({ side: 'NO' })]);
+    mockFetchMarketPrice.mockResolvedValue(makePrice({
+      yesPrice: 0,
+      noPrice:  0,
+      closed:   true,
+      endDate:  '2020-11-04T00:00:00.000Z', // bogus stale endDate from API
     }));
 
     await monitorPositions();
