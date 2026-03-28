@@ -30,13 +30,30 @@ export async function monitorPositions(): Promise<void> {
 
       if (prices.closed) {
         const endDate = prices.endDate?.trim() ? new Date(prices.endDate.trim()) : null;
-        if (!endDate || endDate > new Date()) {
-          console.warn(`[Monitor] Market closed but endDate unknown or future (${prices.endDate || 'none'}) — skipping: ${trade.marketQuestion.slice(0, 50)}`);
+        const now = new Date();
+        const settlementDeadline = endDate ? new Date(endDate.getTime() + 2 * 60 * 60 * 1000) : null; // endDate + 2h buffer
+
+        if (!endDate || settlementDeadline! > now) {
+          console.warn(
+            `[Monitor] Skipping closed market — endDate: ${prices.endDate || 'none'} | ` +
+            `settlementDeadline: ${settlementDeadline?.toISOString() || 'none'} | ` +
+            `yesPrice: ${prices.yesPrice} | noPrice: ${prices.noPrice} | ` +
+            `market: ${trade.marketQuestion.slice(0, 50)}`
+          );
           continue;
         }
+
         const finalPrice = trade.side === 'YES' ? prices.yesPrice : prices.noPrice;
         const won = finalPrice >= 0.99;
         const isDefinitivelyResolved = finalPrice >= 0.99 || finalPrice <= 0.01;
+
+        console.log(
+          `[Monitor] Closed market check — side: ${trade.side} | finalPrice: ${finalPrice} | ` +
+          `yesPrice: ${prices.yesPrice} | noPrice: ${prices.noPrice} | ` +
+          `endDate: ${prices.endDate} | definitive: ${isDefinitivelyResolved} | ` +
+          `market: ${trade.marketQuestion.slice(0, 50)}`
+        );
+
         if (!isDefinitivelyResolved) {
           console.warn(`[Monitor] Market closed but price ambiguous (${finalPrice.toFixed(2)}) — skipping: ${trade.marketQuestion.slice(0, 50)}`);
           continue;
@@ -45,10 +62,10 @@ export async function monitorPositions(): Promise<void> {
         await resolveTrade(trade.id, payout, won ? 'won' : 'lost');
         if (won) {
           const profit = payout - trade.amount;
-          console.log(`[Monitor] RESOLVED WON — +$${profit.toFixed(2)} on ${trade.marketQuestion.slice(0, 40)}`);
+          console.log(`[Monitor] RESOLVED WON — +$${profit.toFixed(2)} | yesPrice: ${prices.yesPrice} | noPrice: ${prices.noPrice} | endDate: ${prices.endDate} | ${trade.marketQuestion.slice(0, 40)}`);
           notify(`✅ *Market Resolved — Won*\n${trade.marketQuestion}\nSide: ${trade.side}\nBought: $${trade.amount} → Payout: $${payout.toFixed(2)} (+$${profit.toFixed(2)})`);
         } else {
-          console.log(`[Monitor] RESOLVED LOST — -$${trade.amount.toFixed(2)} on ${trade.marketQuestion.slice(0, 40)}`);
+          console.log(`[Monitor] RESOLVED LOST — -$${trade.amount.toFixed(2)} | yesPrice: ${prices.yesPrice} | noPrice: ${prices.noPrice} | endDate: ${prices.endDate} | ${trade.marketQuestion.slice(0, 40)}`);
           notify(`❌ *Market Resolved — Lost*\n${trade.marketQuestion}\nSide: ${trade.side}\nBought: $${trade.amount} → Payout: $0.00 (-$${trade.amount.toFixed(2)})`);
         }
         continue;
