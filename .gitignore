@@ -32,3 +32,9 @@ Thumbs.db
 
 # TypeScript
 *.tsbuildinfo
+
+# Test coverage output
+coverage/
+
+# Test build output
+dist-test/

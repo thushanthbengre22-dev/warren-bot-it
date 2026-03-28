@@ -1,18 +1,20 @@
 import Anthropic from '@anthropic-ai/sdk';
 import axios from 'axios';
+import { z } from 'zod';
 import { CONFIG } from '../config';
-import type { Recommendation } from '../config';
 import { Market } from './scanner';
 import { getRecentTrades } from '../store/memory';
 
 const client = new Anthropic({ apiKey: CONFIG.ANTHROPIC_API_KEY });
 
-export interface StrategyResult {
-  probability: number;
-  confidence: number;
-  reasoning: string;
-  recommendation: Recommendation;
-}
+const StrategyResultSchema = z.object({
+  probability:    z.number().min(0).max(1),
+  confidence:     z.number().min(0).max(1),
+  reasoning:      z.string(),
+  recommendation: z.enum(['BUY_YES', 'BUY_NO', 'SKIP']),
+});
+
+export type StrategyResult = z.infer<typeof StrategyResultSchema>;
 
 async function fetchNews(query: string): Promise<string> {
   if (!CONFIG.TAVILY_API_KEY) return 'No news API configured.';
@@ -59,13 +61,20 @@ ${tradeContext}
 
 IMPORTANT: If the news or the market question suggests the underlying event has already taken place, return SKIP immediately.
 Estimate the true probability that the YES outcome ("${market.yesLabel}") occurs.
-Return JSON only — no markdown, no explanation outside the JSON:
+
+You MUST respond with a single JSON object exactly matching this structure — no markdown, no prose, no extra keys:
 {
-  "probability": <0.0–1.0>,
-  "confidence": <0.0–1.0>,
-  "reasoning": "<one or two sentences>",
-  "recommendation": "<BUY_YES | BUY_NO | SKIP>"
+  "probability": 0.72,
+  "confidence": 0.80,
+  "reasoning": "Recent polls show candidate leading by 8 points with high turnout expected.",
+  "recommendation": "BUY_YES"
 }
+
+Field rules:
+- probability: number 0.0–1.0
+- confidence: number 0.0–1.0
+- reasoning: one or two sentences, plain text
+- recommendation: exactly one of "BUY_YES", "BUY_NO", or "SKIP"
 `;
 
   let message;
@@ -93,10 +102,29 @@ When uncertain, set recommendation to SKIP. Capital preservation > chasing signa
   }
 
   const text = message!.content[0].type === 'text' ? message!.content[0].text : '';
-  const match = text.match(/\{[\s\S]*\}/);
+  return parseClaudeResponse(text);
+}
+
+export function parseClaudeResponse(text: string): StrategyResult {
+  const match = text.match(/\{[\s\S]*}/);
   if (!match) {
-    console.warn(`[Strategist] Non-JSON response from Claude, skipping market. Response: ${text.slice(0, 100)}`);
+    console.warn(`[Strategist] Non-JSON response from Claude, skipping market. Response: ${text.slice(0, 200)}`);
     return { probability: 0, confidence: 0, reasoning: 'Claude returned non-JSON response', recommendation: 'SKIP' };
   }
-  return JSON.parse(match[0]) as StrategyResult;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(match[0]);
+  } catch (e) {
+    console.warn(`[Strategist] JSON.parse failed, skipping market. Raw: ${match[0].slice(0, 200)}`);
+    return { probability: 0, confidence: 0, reasoning: 'Claude returned malformed JSON', recommendation: 'SKIP' };
+  }
+
+  const result = StrategyResultSchema.safeParse(parsed);
+  if (!result.success) {
+    console.warn(`[Strategist] Zod validation failed: ${result.error.message}. Raw: ${JSON.stringify(parsed)}`);
+    return { probability: 0, confidence: 0, reasoning: 'Claude response failed schema validation', recommendation: 'SKIP' };
+  }
+
+  return result.data;
 }

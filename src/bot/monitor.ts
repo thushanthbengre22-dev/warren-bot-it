@@ -1,4 +1,4 @@
-import { getOpenTrades, resolveTrade, Trade } from '../store/memory';
+import { getOpenTrades, resolveTrade, updateTradePrice, Trade } from '../store/memory';
 import { fetchMarketPrice } from './scanner';
 import { notify } from '../integrations/telegram';
 
@@ -29,9 +29,9 @@ export async function monitorPositions(): Promise<void> {
       }
 
       if (prices.closed) {
-        const endDate = prices.endDate ? new Date(prices.endDate) : null;
-        if (endDate && endDate > new Date()) {
-          console.warn(`[Monitor] Market closed but endDate is in the future (${prices.endDate}) — skipping: ${trade.marketQuestion.slice(0, 50)}`);
+        const endDate = prices.endDate?.trim() ? new Date(prices.endDate.trim()) : null;
+        if (!endDate || endDate > new Date()) {
+          console.warn(`[Monitor] Market closed but endDate unknown or future (${prices.endDate || 'none'}) — skipping: ${trade.marketQuestion.slice(0, 50)}`);
           continue;
         }
         const finalPrice = trade.side === 'YES' ? prices.yesPrice : prices.noPrice;
@@ -41,7 +41,7 @@ export async function monitorPositions(): Promise<void> {
           console.warn(`[Monitor] Market closed but price ambiguous (${finalPrice.toFixed(2)}) — skipping: ${trade.marketQuestion.slice(0, 50)}`);
           continue;
         }
-        const payout = won ? trade.shares * 1 : 0;
+        const payout = won ? trade.shares : 0; // each winning share settles at $1 on Polymarket
         await resolveTrade(trade.id, payout, won ? 'won' : 'lost');
         if (won) {
           const profit = payout - trade.amount;
@@ -55,6 +55,7 @@ export async function monitorPositions(): Promise<void> {
       }
 
       const currentPrice = trade.side === 'YES' ? prices.yesPrice : prices.noPrice;
+      await updateTradePrice(trade.id, currentPrice);
       const ret = currentReturn(trade, currentPrice);
       const payout = trade.shares * currentPrice;
 

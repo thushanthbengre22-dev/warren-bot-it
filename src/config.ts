@@ -9,8 +9,10 @@ export const CONFIG = {
   MIN_CONFIDENCE:    0.70,
   REQUIRE_APPROVAL:  true,
 
-  // Cron schedule (hourly, 8am–11pm)
+  // Market scan cron (hourly, 8am–11pm)
   CRON_SCHEDULE: '0 8-23 * * *',
+  // Open position monitor cron (every 15 min, 8am–11pm)
+  MONITOR_SCHEDULE: '*/15 8-23 * * *',
 
   // How many markets to scan per cycle
   MARKETS_PER_SCAN: 10,

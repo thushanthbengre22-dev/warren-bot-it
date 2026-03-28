@@ -42,8 +42,6 @@ async function scanCycle(): Promise<void> {
   console.log(`\n[Scan] Starting cycle — balance: $${wallet.balance.toFixed(2)}`);
 
   try {
-    await monitorPositions();
-
     const markets = await fetchMarkets(CONFIG.MARKETS_PER_SCAN);
     console.log(`[Scan] Fetched ${markets.length} markets`);
 
@@ -90,7 +88,8 @@ async function main(): Promise<void> {
   await scanCycle();
 
   cron.schedule(CONFIG.CRON_SCHEDULE, scanCycle, { timezone: 'America/New_York' });
-  console.log('[Cron] Scheduled. Bot is live.');
+  cron.schedule(CONFIG.MONITOR_SCHEDULE, monitorPositions, { timezone: 'America/New_York' });
+  console.log('[Cron] Scheduled. Market scan: hourly | Position monitor: every 15 min. Bot is live.');
 }
 
 main().catch(err => {

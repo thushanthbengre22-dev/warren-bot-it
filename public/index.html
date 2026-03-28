@@ -386,17 +386,17 @@
     <div class="panel-body table-wrap">
       <table id="openTable">
         <colgroup>
-          <col style="width:55%">
-          <col style="width:12%">
+          <col style="width:44%">
+          <col style="width:10%">
+          <col style="width:22%">
           <col style="width:13%">
           <col style="width:11%">
-          <col style="width:9%">
         </colgroup>
         <thead>
           <tr>
             <th>Market<div class="col-resize"></div></th>
             <th>Side<div class="col-resize"></div></th>
-            <th>Price<div class="col-resize"></div></th>
+            <th>Bought → Now<div class="col-resize"></div></th>
             <th>Edge<div class="col-resize"></div></th>
             <th>$</th>
           </tr>
@@ -575,14 +575,29 @@
     if (open.length === 0) {
       openBody.innerHTML = '<tr><td colspan="5" class="empty">No open positions</td></tr>';
     } else {
-      openBody.innerHTML = open.map(t => `
+      openBody.innerHTML = open.map(t => {
+        let priceCell;
+        if (t.currentPrice == null) {
+          priceCell = `${(t.marketPrice * 100).toFixed(1)}% <span style="color:var(--muted)">→ —</span>`;
+        } else {
+          const diff = t.currentPrice - t.marketPrice;
+          const arrow = diff > 0
+            ? `<span style="color:var(--green)">▲</span>`
+            : diff < 0
+              ? `<span style="color:var(--red)">▼</span>`
+              : `<span style="color:var(--muted)">–</span>`;
+          const nowColor = diff > 0 ? 'var(--green)' : diff < 0 ? 'var(--red)' : 'var(--text)';
+          priceCell = `${(t.marketPrice * 100).toFixed(1)}% → <span style="color:${nowColor}">${(t.currentPrice * 100).toFixed(1)}%</span> ${arrow}`;
+        }
+        return `
         <tr>
           <td class="market-cell">${t.marketQuestion}</td>
           <td><span class="badge ${t.side}">${t.side}</span></td>
-          <td>${(t.marketPrice * 100).toFixed(1)}%</td>
+          <td style="font-family:'JetBrains Mono',monospace; font-size:0.78rem;">${priceCell}</td>
           <td style="color:var(--green)">+${(t.edge * 100).toFixed(1)}%</td>
           <td>$${t.amount}</td>
-        </tr>`).join('');
+        </tr>`;
+      }).join('');
     }
 
     // Full history (newest first)
