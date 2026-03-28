@@ -1,7 +1,8 @@
 import axios from 'axios';
 
 export interface Market {
-  id: string;
+  id: string;          // conditionId (on-chain, used for CLOB trading)
+  internalId: string;  // Gamma API internal id (stable, used for price lookups)
   question: string;
   description: string;
   yesPrice: number;   // 0–1 implied probability
@@ -50,10 +51,10 @@ export interface MarketPrice {
   endDate: string;    // market resolution deadline
 }
 
-export async function fetchMarketPrice(marketId: string): Promise<MarketPrice | null> {
+export async function fetchMarketPrice(internalId: string): Promise<MarketPrice | null> {
   try {
     const response = await axios.get(`${POLYMARKET_API}/markets`, {
-      params: { conditionIds: marketId, limit: 1 },
+      params: { id: internalId, limit: 1 },
       timeout: 8_000,
     });
     const markets = response.data as any[];
@@ -86,6 +87,7 @@ export async function fetchMarkets(limit = 10): Promise<Market[]> {
       if (!prices) return [];   // skip non-Yes/No markets (sports, team names, etc.)
       return [{
         id:          m.conditionId ?? m.id,
+        internalId:  m.id,
         question:    m.question,
         description: m.description ?? '',
         yesPrice:    prices.yesPrice,

@@ -51,8 +51,9 @@ export async function simulateTrade(signal: TradeSignal): Promise<Trade> {
   const shares = signal.amount / signal.marketPrice;
 
   const trade = await recordTrade({
-    marketId:       signal.market.id,
-    marketQuestion: signal.market.question,
+    marketId:         signal.market.id,
+    marketInternalId: signal.market.internalId,
+    marketQuestion:   signal.market.question,
     side:           signal.side,
     marketPrice:    signal.marketPrice,
     claudeEstimate: signal.strategy.probability,

@@ -25,6 +25,7 @@ function makeMarket(overrides: Partial<Market> = {}): Market {
   const endDate = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(); // 48h from now
   return {
     id:          'mkt_001',
+    internalId:  '123456',
     question:    'Will candidate X win?',
     description: 'US election market',
     yesPrice:    0.50,
@@ -157,7 +158,7 @@ describe('buildSignal — should return null', () => {
 
   it('should return null when already have an open position in this market', async () => {
     const trade = {
-      id: 'trade_existing', timestamp: '', marketId: 'mkt_001',
+      id: 'trade_existing', timestamp: '', marketId: 'mkt_001', marketInternalId: '123456',
       marketQuestion: 'Will candidate X win?', side: 'YES' as const,
       marketPrice: 0.5, claudeEstimate: 0.65, edge: 0.15,
       amount: 5, shares: 10, status: 'open' as const,

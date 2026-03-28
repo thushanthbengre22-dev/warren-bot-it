@@ -6,7 +6,8 @@ const WALLET_KEY = 'warren:wallet';
 export interface Trade {
   id: string;
   timestamp: string;
-  marketId: string;
+  marketId: string;         // conditionId — for CLOB trading
+  marketInternalId: string; // Gamma API internal id — for price lookups
   marketQuestion: string;
   side: 'YES' | 'NO';
   marketPrice: number;

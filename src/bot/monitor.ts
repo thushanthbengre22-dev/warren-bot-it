@@ -17,9 +17,14 @@ export async function monitorPositions(): Promise<void> {
 
   for (const trade of openTrades) {
     try {
-      const prices = await fetchMarketPrice(trade.marketId);
+      const prices = await fetchMarketPrice(trade.marketInternalId);
       if (!prices) {
         console.warn(`[Monitor] Could not fetch price for ${trade.marketId}`);
+        continue;
+      }
+
+      if (prices.yesPrice === 0 && prices.noPrice === 0) {
+        console.warn(`[Monitor] Skipping — both prices are 0 (stale/invalid API data): ${trade.marketQuestion.slice(0, 50)}`);
         continue;
       }
 
