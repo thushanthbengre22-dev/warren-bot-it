@@ -2,7 +2,7 @@
 
 A Polymarket AI trading bot running in **paper trading mode** — no real money, no real trades.
 
-Scans live Polymarket prediction markets hourly (8am–11pm), uses Claude Sonnet to estimate probabilities, detects edges against the market price, and alerts via Telegram with Approve/Skip buttons. All trades are simulated against a virtual $50 wallet persisted in Redis.
+Scans live Polymarket prediction markets hourly (8am–11pm), uses Claude Sonnet to estimate probabilities, detects edges against the market price, and alerts via Telegram with Approve/Skip buttons. Open positions are monitored every 15 minutes. All trades are simulated against a virtual $50 wallet persisted in Redis.
 
 ---
 
@@ -10,7 +10,8 @@ Scans live Polymarket prediction markets hourly (8am–11pm), uses Claude Sonnet
 
 ```mermaid
 graph TD
-    A[Cron: hourly, 8am-11pm] --> B[Monitor Open Positions]
+    A[Market Scan: hourly, 8am-11pm] --> B[Monitor Open Positions]
+    M2[Position Monitor: every 15 min, 8am-11pm] --> B
     B -->|fetch current price| C[Polymarket Gamma API]
     C -->|±25% threshold hit| D[Auto Cashout - no approval needed]
     D -->|update wallet| R[(Upstash Redis)]
@@ -51,6 +52,31 @@ graph TD
 | Storage | Upstash Redis (`ioredis`) | Persistent wallet state survives deploys, works on Railway free tier |
 | Dashboard | Express + Vanilla HTML/CSS/JS + SSE | Read-only status screen — no React needed, no build step |
 | Deployment | Railway (bot + API) | Persistent process — Vercel can't run cron or Telegram polling |
+
+---
+
+## Claude Response Validation
+
+Claude's JSON responses are validated with a **Zod schema** before being used. This prevents malformed, structurally invalid, or out-of-range responses from causing silent bad trades or runtime crashes.
+
+Three-stage parsing pipeline in `src/bot/strategist.ts`:
+
+1. **Regex extraction** — catches responses with no JSON block at all (e.g. Claude replies with prose)
+2. **`JSON.parse` in try/catch** — catches syntactically invalid JSON (trailing commas, unquoted values, etc.)
+3. **`StrategyResultSchema.safeParse`** — catches wrong field types, out-of-range numbers, and invalid enum values
+
+Any failure at any stage is logged and the market is safely skipped (`recommendation: "SKIP"`).
+
+The prompt also includes a concrete example JSON with explicit field rules, which reduces non-JSON responses from Claude:
+
+```typescript
+const StrategyResultSchema = z.object({
+  probability:    z.number().min(0).max(1),
+  confidence:     z.number().min(0).max(1),
+  reasoning:      z.string(),
+  recommendation: z.enum(['BUY_YES', 'BUY_NO', 'SKIP']),
+});
+```
 
 ---
 
@@ -122,7 +148,7 @@ src/
   config.ts                — All constants, limits, env vars
   bot/
     scanner.ts             — Fetches live Polymarket markets + real-time prices
-    strategist.ts          — Claude API call + Tavily news fetch
+    strategist.ts          — Claude API call + Tavily news fetch + Zod response validation
     executor.ts            — Builds trade signals, dedup checks, simulates trades
     monitor.ts             — Checks open positions, triggers auto cashouts
   integrations/
@@ -134,7 +160,45 @@ src/
     state.ts               — In-memory runtime state (cron status, pending approvals, signal store)
 public/
   index.html               — Dashboard UI (vanilla HTML/CSS/JS, live SSE updates)
+tests/
+  monitor.test.ts          — Position monitoring, auto-close bug regression, stop-loss/take-profit
+  strategist.test.ts       — Claude JSON parsing, malformed responses, Zod schema validation
+  executor.test.ts         — Signal building, edge/confidence filters, dedup checks
 ```
+
+---
+
+## Testing
+
+```bash
+npm test               # run all tests
+npm run test:watch     # watch mode
+npm test -- --coverage # with coverage report
+```
+
+### Test Coverage
+
+Coverage is measured on the **core bot logic** — the modules that make trading decisions. Infrastructure modules (Redis, Telegram, Express) are mocked in tests and excluded from meaningful coverage targets.
+
+| File | Statements | Branches | Functions | Lines |
+|---|---|---|---|---|
+| `bot/monitor.ts` | **100%** | **97%** | **100%** | **100%** |
+| `bot/executor.ts` | **89%** | **95%** | **80%** | **87%** |
+| `bot/strategist.ts` (parser) | 46% | 29% | 17% | 50% |
+| `bot/scanner.ts` | 11% | 0% | 0% | 13% |
+| `store/memory.ts` | 22% | 0% | 0% | 24% |
+| `store/state.ts` | 37% | 0% | 0% | 39% |
+| **Overall** | **43%** | **41%** | **12%** | **46%** |
+
+`monitor.ts` and `executor.ts` are at near-full coverage because they contain the most critical decision logic. `strategist.ts` overall is lower because the `analyzeMarket` function (which calls the real Anthropic and Tavily APIs) is not unit-tested — only the exported `parseClaudeResponse` parser is. `scanner.ts` and `store/` modules require live Redis and HTTP and are integration-test targets, not unit-test targets.
+
+### Test Suites
+
+| Suite | Tests | What it covers |
+|---|---|---|
+| `monitor.test.ts` | 17 | Auto-close bug regression (2 tests), closed-market resolution, stop-loss at −25%, take-profit at +25%, null price handling, error isolation between trades |
+| `strategist.test.ts` | 20 | Valid JSON parsing, JSON embedded in prose, empty/whitespace responses, missing closing brace, trailing comma, unquoted values, Zod type/range/enum violations |
+| `executor.test.ts` | 9 | Signal built with sufficient edge + confidence, null on SKIP/low confidence/low edge/expiry <2h/zero balance/existing position/pending approval |
 
 ---
 
@@ -159,7 +223,7 @@ The bot requires a **persistent process** (cron + Telegram long-polling). It is 
 ```
 Railway (warren-bot-it)
   └── Node.js process
-        ├── node-cron        → scans every 5 min
+        ├── node-cron        → market scan hourly, position monitor every 15 min
         ├── Telegram polling → listens for Approve/Skip
         └── Express :PORT    → serves dashboard + API
 ```
@@ -175,7 +239,7 @@ Railway sets `PORT` automatically — the server binds to `process.env.PORT`.
 
 ## Running Costs
 
-All services used have a free or low-cost tier. Approximate monthly cost running hourly scans (8am–11pm, 16 cycles/day):
+All services used have a free or low-cost tier. Approximate monthly cost running hourly market scans + 15-min position monitoring (8am–11pm):
 
 | Service | Usage | Cost |
 |---|---|---|

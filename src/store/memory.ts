@@ -17,6 +17,8 @@ export interface Trade {
   status: 'open' | 'won' | 'lost' | 'cancelled';
   payout?: number;
   resolvedAt?: string;
+  currentPrice?: number;
+  lastPriceAt?: string;
 }
 
 export interface WalletState {
@@ -77,6 +79,15 @@ export async function resolveTrade(id: string, payout: number, status: 'won' | '
   await saveState(state);
   emitUpdate();
   return trade;
+}
+
+export async function updateTradePrice(id: string, currentPrice: number): Promise<void> {
+  const state = await loadState();
+  const trade = state.trades.find(t => t.id === id);
+  if (!trade) return;
+  trade.currentPrice = currentPrice;
+  trade.lastPriceAt  = new Date().toISOString();
+  await saveState(state);
 }
 
 export async function getOpenTrades(): Promise<Trade[]> {
