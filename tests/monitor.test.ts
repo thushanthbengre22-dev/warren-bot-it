@@ -120,6 +120,21 @@ describe('market closed flag handling', () => {
     expect(mockResolveTrade).not.toHaveBeenCalled();
   });
 
+  it('should skip trade when closed=true but endDate just passed (within 2h settlement buffer)', async () => {
+    // endDate is 30 min ago — trading just closed but not yet settled on-chain
+    mockGetOpenTrades.mockResolvedValue([makeTrade()]);
+    mockFetchMarketPrice.mockResolvedValue(makePrice({
+      yesPrice: 0.01,
+      noPrice:  0.99,
+      closed:   true,
+      endDate:  new Date(Date.now() - 30 * 60 * 1000).toISOString(), // 30 min ago
+    }));
+
+    await monitorPositions();
+
+    expect(mockResolveTrade).not.toHaveBeenCalled();
+  });
+
   it('should skip trade when closed=true but endDate is in the future', async () => {
     mockGetOpenTrades.mockResolvedValue([makeTrade()]);
     mockFetchMarketPrice.mockResolvedValue(makePrice({
