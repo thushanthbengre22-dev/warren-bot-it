@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import axios from 'axios';
 import { z } from 'zod';
+import { encode } from '@jtml/core';
 import { CONFIG } from '../config';
 import { Market } from './scanner';
 import { getRecentTrades } from '../store/memory';
@@ -26,9 +27,14 @@ async function fetchNews(query: string): Promise<string> {
       max_results: 3,
     }, { timeout: 8_000 });
 
-    return (res.data.results as { title: string; content?: string }[])
-      .map(r => `• ${r.title}: ${r.content?.slice(0, 200)}`)
-      .join('\n');
+    const results = (res.data.results as { title: string; content?: string }[]);
+    if (results.length === 0) return 'No news found.';
+
+    const newsData = results.map(r => ({
+      title:   r.title,
+      content: r.content?.slice(0, 200) ?? '',
+    }));
+    return encode(newsData);
   } catch {
     return 'Could not fetch news.';
   }
@@ -38,9 +44,12 @@ export async function analyzeMarket(market: Market): Promise<StrategyResult> {
   const news = await fetchNews(market.question);
   const recentTrades = await getRecentTrades(5);
   const tradeContext = recentTrades.length > 0
-    ? `Recent bot trades:\n${recentTrades.map(t =>
-        `- ${t.marketQuestion}: ${t.side} @ ${t.marketPrice} (status: ${t.status})`
-      ).join('\n')}`
+    ? `Recent bot trades (JTML):\n${encode(recentTrades.map(t => ({
+        market: t.marketQuestion.slice(0, 60),
+        side:   t.side,
+        price:  t.marketPrice,
+        status: t.status,
+      })))}`
     : 'No recent trades.';
 
   const now = new Date().toISOString();
@@ -89,7 +98,8 @@ Only recommend a trade if:
 - Your probability differs from market price by > ${CONFIG.MIN_EDGE * 100}%
 - Your confidence is > ${CONFIG.MIN_CONFIDENCE}
 - The news is recent and relevant
-When uncertain, set recommendation to SKIP. Capital preservation > chasing signals.`,
+When uncertain, set recommendation to SKIP. Capital preservation > chasing signals.
+Structured data in the prompt (news, recent trades) is encoded in JTML format: @schema declares field names and types, @data/@array contains pipe-delimited values in the same order.`,
         messages: [{ role: 'user', content: prompt }],
       });
       break;

@@ -48,6 +48,7 @@ graph TD
 | AI brain | Claude Sonnet (`@anthropic-ai/sdk`) | Best probability reasoning, structured JSON output |
 | Market data | Polymarket Gamma API | Public, no auth — real-time prices and market metadata |
 | News context | Tavily Search API | Fetches fresh headlines to inform Claude's estimate |
+| Prompt encoding | `@jtml/core` | Encodes news and trade arrays in JTML format before sending to Claude — ~40% token reduction on structured data |
 | Notifications | Telegram Bot API (`node-telegram-bot-api`) | Inline keyboard Approve/Skip buttons, instant mobile alerts |
 | Storage | Upstash Redis (`ioredis`) | Persistent wallet state survives deploys, works on Railway free tier |
 | Dashboard | Express + Vanilla HTML/CSS/JS + SSE | Read-only status screen — no React needed, no build step |
@@ -77,6 +78,42 @@ const StrategyResultSchema = z.object({
   recommendation: z.enum(['BUY_YES', 'BUY_NO', 'SKIP']),
 });
 ```
+
+---
+
+## Prompt Token Optimisation
+
+Structured data sent to Claude (news results and recent trades) is encoded in **JTML format** using the [`@jtml/core`](https://www.npmjs.com/package/@jtml/core) library before being inserted into the prompt. This reduces token usage by ~40% on those sections compared to plain JSON.
+
+JTML works by declaring the schema once and then packing all rows as pipe-delimited values:
+
+```
+@schema title:string|content:string
+@array
+Iran tensions rise as US moves carrier|US military has positioned a carrier...
+White House declines to comment|Press secretary said all options remain...
+```
+
+Two places in `src/bot/strategist.ts` use JTML encoding:
+
+1. **News results** (`fetchNews`) — each headline + snippet is encoded before being appended to the prompt.
+2. **Recent trades** (`tradeContext`) — the last 5 trades (market, side, price, status) are encoded as a JTML block.
+
+The system prompt includes an explanation of the JTML format so Claude can parse the structured data.
+
+**Important guard:** `encode([])` throws — both callsites check array length before encoding and fall back to a plain-text message (`'No news found.'` / `'No recent trades.'`) when the array is empty.
+
+**Approximate cost saving at higher cadence:**
+
+The current scan runs hourly (16×/day). At the current rate JTML saves a modest amount. But at a hypothetical 5-minute scan running 24 hours a day (288 cycles × 10 markets = 2,880 calls/day), the numbers look like this:
+
+| | Tokens/day | Input cost/day (Sonnet @ $3/M) |
+|---|---|---|
+| Without JTML | ~3,168,000 | ~$9.50 |
+| With JTML (−120 tokens/call) | ~2,822,400 | ~$8.47 |
+| **Saving** | ~346,000 | **~$1.04/day (~$31/month)** |
+
+The ~120 tokens/call saving comes from 40% compression on the structured portions of the prompt (news headlines + recent trades), which together make up roughly 300 of the ~1,100 tokens per call. The fixed parts of the prompt (market question, prices, dates, field rules) are not encoded.
 
 ---
 
