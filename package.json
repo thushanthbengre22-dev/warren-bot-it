@@ -25,6 +25,7 @@
   "homepage": "https://github.com/thushanthbengre22-dev/warren-bot-it#readme",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
+    "@jtml/core": "^0.1.0",
     "@types/ioredis": "^4.28.10",
     "axios": "^1.13.6",
     "dotenv": "^17.3.1",
